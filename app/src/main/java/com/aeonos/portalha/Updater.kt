@@ -18,7 +18,7 @@ import java.net.URL
 // skip that without device-owner privileges, which a sideloaded app doesn't have.
 object Updater {
     private const val TAG = "PortalHA"
-    private const val REPO = "RoadRunner-1024/portal-ha-bridge"
+    private const val REPO = BuildConfig.UPDATE_REPO
     private const val APK_ASSET = "portal-ha-bridge.apk"
 
     data class Release(val version: String, val apkUrl: String, val notes: String = "")
