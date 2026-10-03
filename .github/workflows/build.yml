@@ -16,6 +16,16 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+  # Called by sync-upstream.yml: pushes made with the Actions token don't trigger
+  # workflows, so the tag-push path can't be relied on there.
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+      release_tag:
+        type: string
+        required: true
 
 permissions:
   contents: write
@@ -25,6 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - uses: actions/setup-java@v5
         with:
@@ -55,15 +67,15 @@ jobs:
           EOF
 
       - name: Build
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || (startsWith(github.ref, 'refs/tags/v') && github.ref_name || '') }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             gradle --no-daemon :app:assembleDebug
             cp app/build/outputs/apk/debug/app-debug.apk portal-ha-bridge.apk
           else
             EXTRA=""
-            case "$GITHUB_REF" in
-              refs/tags/v*) EXTRA="-PversionNameOverride=${GITHUB_REF_NAME#v}" ;;
-            esac
+            [ -n "$RELEASE_TAG" ] && EXTRA="-PversionNameOverride=${RELEASE_TAG#v}"
             gradle --no-daemon :app:assembleRelease $EXTRA
             cp app/build/outputs/apk/release/app-release.apk portal-ha-bridge.apk
           fi
@@ -74,9 +86,11 @@ jobs:
           path: portal-ha-bridge.apk
 
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: ${{ inputs.release_tag || startsWith(github.ref, 'refs/tags/v') }}
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
-          gh release create "$GITHUB_REF_NAME" portal-ha-bridge.apk \
-            --title "$GITHUB_REF_NAME" --generate-notes
+          # --target creates the tag at the built commit when it doesn't exist yet.
+          gh release create "$RELEASE_TAG" portal-ha-bridge.apk \
+            --target "$(git rev-parse HEAD)" --title "$RELEASE_TAG" --generate-notes

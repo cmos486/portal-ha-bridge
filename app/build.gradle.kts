@@ -25,12 +25,6 @@ android {
         versionCode = 49
         versionName = "1.21.1"
 
-        // GitHub repo the in-app updater pulls releases from. A fork signed with its own
-        // key sets updateRepo in gradle.properties so it never offers an APK that can't
-        // install over it.
-        val updateRepo = (project.findProperty("updateRepo") as String?) ?: "RoadRunner-1024/portal-ha-bridge"
-        buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
-
         // Portals are ARM — ship only ARM native libs (Vosk/RootEncoder bundle x86 +
         // x86_64 + mips for emulators, ~20 MB of dead weight on real hardware).
         ndk {
@@ -38,8 +32,12 @@ android {
         }
     }
 
-    // CI release builds pass -PversionNameOverride=<tag> so the in-app updater compares
-    // against the fork's own release tags (e.g. 1.21.1.1 on top of upstream 1.21.1).
+    // GitHub repo the in-app updater pulls releases from. A fork signed with its own key
+    // sets updateRepo in gradle.properties so it never offers an APK that can't install
+    // over it. CI release builds pass -PversionNameOverride=<tag> so the updater compares
+    // against the fork's own tags (e.g. 1.21.1.1 on top of upstream 1.21.1).
+    val updateRepo = (project.findProperty("updateRepo") as String?) ?: "RoadRunner-1024/portal-ha-bridge"
+    defaultConfig.buildConfigField("String", "UPDATE_REPO", "\"$updateRepo\"")
     (project.findProperty("versionNameOverride") as String?)?.let { defaultConfig.versionName = it }
 
     buildFeatures {

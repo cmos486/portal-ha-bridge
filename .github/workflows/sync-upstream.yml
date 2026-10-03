@@ -1,0 +1,114 @@
+name: Sync upstream release
+
+# Once a day: if RoadRunner-1024 published a release this fork hasn't shipped yet,
+# merge that release tag into universal and publish it as <tag>.1 with the upstream
+# release notes, so tablets get the in-app update prompt just like a Portal.
+# A merge conflict publishes nothing and opens an issue instead.
+#
+# Merge rather than rebase: the Actions token may not push rewritten commits that
+# touch .github/workflows, and a merge also avoids force-pushing universal.
+
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency: sync-upstream
+
+env:
+  UPSTREAM: RoadRunner-1024/portal-ha-bridge
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.merge.outputs.tag }}
+      upstream_tag: ${{ steps.check.outputs.upstream_tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: universal
+          fetch-depth: 0
+
+      - name: Find upstream's latest release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          UP=$(gh api "repos/$UPSTREAM/releases/latest" --jq .tag_name)
+          echo "upstream_tag=$UP" >> "$GITHUB_OUTPUT"
+          git fetch --tags origin
+          if git tag -l "$UP.*" | grep -q .; then
+            echo "Already shipped $UP as $(git tag -l "$UP.*" | tr '\n' ' ')"
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New upstream release: $UP"
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge it into universal
+        id: merge
+        if: steps.check.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UP: ${{ steps.check.outputs.upstream_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --no-tags "https://github.com/$UPSTREAM.git" "refs/tags/$UP:refs/tags/$UP"
+          if git merge --no-edit -m "Merge upstream $UP" "$UP"; then
+            git push origin HEAD:universal
+            echo "tag=$UP.1" >> "$GITHUB_OUTPUT"
+          else
+            git diff --name-only --diff-filter=U > conflicts.txt
+            git merge --abort
+            TITLE="Upstream $UP doesn't merge cleanly"
+            if ! gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[].number' | grep -q .; then
+              {
+                echo "The daily sync couldn't merge upstream release \`$UP\` into \`universal\`, so nothing was published."
+                echo
+                echo "Conflicting files:"
+                sed 's/^/- `/; s/$/`/' conflicts.txt
+                echo
+                echo "Resolve locally:"
+                echo '```'
+                echo "git fetch upstream --tags && git checkout universal && git merge $UP"
+                echo "# fix conflicts, commit, then:"
+                echo "git push origin universal && git tag $UP.1 && git push origin $UP.1"
+                echo '```'
+              } > body.md
+              gh issue create --title "$TITLE" --body-file body.md
+            fi
+            exit 1
+          fi
+
+  build:
+    needs: sync
+    if: needs.sync.outputs.tag != ''
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: universal
+      release_tag: ${{ needs.sync.outputs.tag }}
+    secrets: inherit
+
+  notes:
+    needs: [sync, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Carry over upstream's release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.sync.outputs.tag }}
+          UP: ${{ needs.sync.outputs.upstream_tag }}
+        run: |
+          {
+            gh api "repos/$UPSTREAM/releases/tags/$UP" --jq .body
+            echo
+            echo "---"
+            echo "Universal build of upstream [$UP](https://github.com/$UPSTREAM/releases/tag/$UP) for any Android tablet."
+          } > notes.md
+          gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file notes.md
