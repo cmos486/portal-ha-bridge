@@ -4,6 +4,51 @@ All notable changes to Portal HA Bridge. Versions are the app `versionName`;
 the in-app updater (Settings → System & Updates) and the provisioner both pull
 the latest GitHub release.
 
+## v1.22.0 — Your apps in the menu, and a way back from anywhere
+
+**Added**
+- **App tiles in the menu.** Swipe in from the left and, under Hold to Announce, there's now an
+  **Apps** section: the apps you choose, as big icons two to a row. Tap **Edit** to pick which
+  apps appear. Anything you open from here stays on screen — the dashboard won't pull itself
+  back over it.
+- **A Calls tile.** First in the list, it takes you straight to the Portal's calling screen —
+  the same way Home Assistant's Calls button does, photo screen skipped, dashboard back after
+  the call. Untick it in **Edit** if you don't want it.
+- **A Home button** in the menu that opens whatever launcher your Portal uses (Immortal, the
+  stock one, or another).
+- **Swipe from the left edge in any app** (Display & Presence, off by default). Turn it on and
+  the left-edge swipe works on top of other apps too: the menu slides in over the app you're
+  in, without leaving it. Tap the dimmed area to go straight back to that app, or **Back to HA
+  Bridge** for the dashboard. A faint handle on the left edge shows where to swipe. It also
+  works over the photo screensaver — only a swipe counts there, so tapping its left side still
+  goes back a photo. It steps aside whenever a call is ringing or connected.
+- **Use as the Portal's home screen** (System & Updates, off by default), for Portals with no
+  other launcher you want: Home and every restart then land on the dashboard. Leave it off if
+  you use Immortal.
+
+## v1.21.2 — Mirror the camera, share the mic, keep your doorbell app up
+
+**Added**
+- **Mirror Stream.** The camera stream came out mirrored like a selfie on every Portal model,
+  so text in the room read backwards. A new **Mirror Stream** button (Camera settings, under
+  Rotate) and Home Assistant switch flip it the right way round for every viewer — NVRs, phone
+  apps and HA alike. It works at any Rotate setting and switches instantly, without the stream
+  reconnecting. Off by default, so nothing changes until you turn it on.
+- **Coexist with Voice Assistant is now a Home Assistant switch.** If you run another voice
+  satellite (such as Ava) on the Portal, an automation can now hand the microphone back and
+  forth — for example, give it to the camera stream's room audio while you're watching the live
+  view, and back to the satellite afterwards. While the Portal's own Jarvis or Alexa wake word is
+  on, the switch shows as unavailable, because those need the microphone themselves.
+- **"Return to the dashboard when an app opens by itself"** (Display settings, on by default).
+  Turn it off if a Home Assistant automation opens apps for you — a doorbell camera app, say —
+  and you want them to stay on screen instead of the dashboard coming back over them. Alexa
+  announcements are still cleared away either way, so the wake word keeps working.
+
+**Fixed**
+- **The Sound Level sensor no longer disappears** from Home Assistant while Coexist has the
+  microphone. It now shows as unavailable and comes back with readings when the microphone
+  does.
+
 ## v1.21.1 — Music and calls get along
 
 **Fixed**
